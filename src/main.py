@@ -9,6 +9,7 @@ from clan import Clan
 from combat import Combat
 from inventory import SAMPLE_ITEMS
 from save_system import SaveSystem
+from crafting import CraftingSystem
 
 
 def main():
@@ -16,7 +17,7 @@ def main():
     print("Мир драконов ждёт тебя...\n")
 
     # Создаём игрока
-    player = Rider(name="Аэрион", level=1, health=100, attack=15, defense=10)
+    player = Rider(name="Аэрион", level=3, health=100, attack=15, defense=10)  # Уровень 3 для крафта
     player_dragon = Dragon(name="Игнис", element="fire", level=1, health=150, attack=25)
 
     # Связываем наездника и дракона
@@ -27,7 +28,9 @@ def main():
     print("=== Получение стартовых предметов ===")
     player.inventory.add_item(SAMPLE_ITEMS["iron_sword"])
     player.inventory.add_item(SAMPLE_ITEMS["leather_armor"])
-    player.inventory.add_item(SAMPLE_ITEMS["health_potion"], quantity=3)
+    player.inventory.add_item(SAMPLE_ITEMS["health_potion"], quantity=5)
+    player.inventory.add_item(SAMPLE_ITEMS["dragon_scale"], quantity=8)
+    player.inventory.add_item(SAMPLE_ITEMS["storm_amulet"])
     player_dragon.inventory.add_item(SAMPLE_ITEMS["fire_saddle"])
 
     print()
@@ -36,9 +39,47 @@ def main():
     print()
     print(player.inventory)
     print()
-    print(player.skills)
+
+    # === Экипировка ===
+    print("=== Экипировка ===")
+    player.equip_item("iron_sword")
+    player.equip_item("leather_armor")
+    player_dragon.equip_item("fire_saddle")
+
     print()
-    print(player_dragon.skills)
+    print(player)
+    print(player.equipment)
+    print()
+    print(player_dragon)
+    print(player_dragon.equipment)
+    print()
+
+    # === Крафт ===
+    print("=== Система крафта ===")
+    crafting = CraftingSystem()
+    crafting.print_recipes(player_level=player.level)
+
+    print("\nПробуем скрафтить Большое зелье здоровья...")
+    crafting.craft("craft_greater_potion", player.inventory, player.level)
+
+    print("\nПробуем скрафтить Стальной меч...")
+    crafting.craft("craft_steel_sword", player.inventory, player.level)
+
+    print("\nПробуем скрафтить Чешуйчатый доспех...")
+    crafting.craft("craft_scale_armor", player.inventory, player.level)
+
+    print()
+    print(player.inventory)
+    print()
+
+    # Экипируем скрафченные предметы
+    print("=== Экипируем новые предметы ===")
+    player.equip_item("steel_sword")
+    player.equip_item("scale_armor")
+
+    print()
+    print(player)
+    print(player.equipment)
     print()
 
     # Создаём врага
@@ -49,7 +90,7 @@ def main():
     clan = Clan(name="Пламенные Крылья")
     clan.add_member(player)
 
-    print(f"\nТы — {player.name}, наездник дракона {player_dragon.name}")
+    print(f"Ты — {player.name}, наездник дракона {player_dragon.name}")
     print(f"Твой клан: {clan.name}\n")
 
     # Пример использования навыка
@@ -67,18 +108,14 @@ def main():
     print("\n=== Система сохранения ===")
     save_system = SaveSystem()
 
-    # Сохраняем
     save_data = {
         "player": player.to_dict(),
         "dragon": player_dragon.to_dict(),
         "clan_name": clan.name
     }
     save_system.save_game(save_data, slot=1)
-
-    # Показываем список сохранений
     save_system.print_saves()
 
-    # Пример загрузки
     print("\n=== Загрузка сохранения ===")
     loaded = save_system.load_game(slot=1)
     if loaded:
@@ -86,6 +123,7 @@ def main():
         loaded_dragon = Dragon.from_dict(loaded["dragon"])
         print(f"Загружен персонаж: {loaded_player}")
         print(f"Загружен дракон: {loaded_dragon}")
+        print(loaded_player.equipment)
 
 
 if __name__ == "__main__":
