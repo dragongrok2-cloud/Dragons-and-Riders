@@ -1,9 +1,9 @@
 """
 Система инвентаря для персонажей и драконов
-С поддержкой качества предметов
+С поддержкой качества предметов и зачарований
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from enum import Enum
 import random
 
@@ -18,11 +18,11 @@ class ItemType(Enum):
 
 
 class ItemQuality(Enum):
-    COMMON = "common"          # Обычный
-    UNCOMMON = "uncommon"      # Необычный
-    RARE = "rare"              # Редкий
-    EPIC = "epic"              # Эпический
-    LEGENDARY = "legendary"    # Легендарный
+    COMMON = "common"
+    UNCOMMON = "uncommon"
+    RARE = "rare"
+    EPIC = "epic"
+    LEGENDARY = "legendary"
 
     @property
     def display_name(self) -> str:
@@ -37,7 +37,6 @@ class ItemQuality(Enum):
 
     @property
     def color_tag(self) -> str:
-        """Для красивого отображения"""
         tags = {
             "common": "⬜",
             "uncommon": "🟩",
@@ -49,7 +48,6 @@ class ItemQuality(Enum):
 
     @property
     def multiplier(self) -> float:
-        """Множитель характеристик"""
         multipliers = {
             "common": 1.0,
             "uncommon": 1.25,
@@ -71,7 +69,6 @@ class ItemQuality(Enum):
         return multipliers.get(self.value, 1.0)
 
 
-# Шансы выпадения качества (можно использовать при генерации лута)
 QUALITY_WEIGHTS = {
     ItemQuality.COMMON: 50,
     ItemQuality.UNCOMMON: 30,
@@ -82,7 +79,6 @@ QUALITY_WEIGHTS = {
 
 
 def roll_quality() -> ItemQuality:
-    """Случайное качество по весам"""
     qualities = list(QUALITY_WEIGHTS.keys())
     weights = list(QUALITY_WEIGHTS.values())
     return random.choices(qualities, weights=weights, k=1)[0]
@@ -102,14 +98,13 @@ class Item:
         self.quality = quality
         self.stackable = stackable
         self.max_stack = max_stack
+        self.enchantments: List[Any] = []  # AppliedEnchantment
 
-        # Базовые значения (до применения качества)
         self.base_attack = base_attack if base_attack is not None else attack_bonus
         self.base_defense = base_defense if base_defense is not None else defense_bonus
         self.base_health = base_health if base_health is not None else health_bonus
         self.base_value = base_value if base_value is not None else value
 
-        # Применяем множители качества
         self._apply_quality()
 
     def _apply_quality(self):
@@ -120,12 +115,25 @@ class Item:
         self.value = int(self.base_value * self.quality.value_multiplier)
 
     def set_quality(self, quality: ItemQuality):
-        """Изменить качество и пересчитать бонусы"""
         self.quality = quality
         self._apply_quality()
+        # После смены качества нужно заново применить бонусы зачарований
+        self._reapply_enchant_bonuses()
+
+    def _reapply_enchant_bonuses(self):
+        """Добавляет бонусы от зачарований после пересчёта качества"""
+        if not self.enchantments:
+            return
+        for ae in self.enchantments:
+            etype = ae.enchantment.enchant_type.value if hasattr(ae.enchantment.enchant_type, 'value') else str(ae.enchantment.enchant_type)
+            if etype == "attack":
+                self.attack_bonus += ae.bonus
+            elif etype == "defense":
+                self.defense_bonus += ae.bonus
+            elif etype == "health":
+                self.health_bonus += ae.bonus
 
     def upgrade_quality(self) -> bool:
-        """Повысить качество на один уровень"""
         order = [
             ItemQuality.COMMON,
             ItemQuality.UNCOMMON,
@@ -146,7 +154,7 @@ class Item:
             return False
 
     def to_dict(self) -> dict:
-        return {
+        data = {
             "id": self.id,
             "name": self.name,
             "item_type": self.item_type.value,
@@ -161,8 +169,11 @@ class Item:
             "health_bonus": self.health_bonus,
             "value": self.value,
             "stackable": self.stackable,
-            "max_stack": self.max_stack
+            "max_stack": self.max_stack,
         }
+        if self.enchantments:
+            data["enchantments"] = [ae.to_dict() for ae in self.enchantments]
+        return data
 
     @classmethod
     def from_dict(cls, data: dict) -> "Item":
@@ -180,6 +191,14 @@ class Item:
             stackable=data.get("stackable", False),
             max_stack=data.get("max_stack", 1)
         )
+        # Восстанавливаем зачарования
+        if "enchantments" in data and data["enchantments"]:
+            try:
+                from enchanting import AppliedEnchantment
+                item.enchantments = [AppliedEnchantment.from_dict(e) for e in data["enchantments"]]
+                item._reapply_enchant_bonuses()
+            except ImportError:
+                pass
         return item
 
     def __str__(self):
@@ -191,23 +210,26 @@ class Item:
         if self.health_bonus:
             bonuses.append(f"HP+{self.health_bonus}")
         bonus_str = f" ({', '.join(bonuses)})" if bonuses else ""
-        return f"{self.quality.color_tag} [{self.quality.display_name}] {self.name}{bonus_str}"
+
+        ench_str = ""
+        if self.enchantments:
+            ench_names = [str(ae) for ae in self.enchantments]
+            ench_str = f" 🔮[{', '.join(ench_names)}]"
+
+        return f"{self.quality.color_tag} [{self.quality.display_name}] {self.name}{bonus_str}{ench_str}"
 
 
 class Inventory:
     def __init__(self, capacity: int = 20):
         self.capacity = capacity
-        # Ключ теперь учитывает качество: f"{item_id}_{quality}"
-        self.items: Dict[str, dict] = {}  # unique_key -> {"item": Item, "quantity": int}
+        self.items: Dict[str, dict] = {}
 
     def _make_key(self, item: Item) -> str:
-        """Уникальный ключ с учётом качества (для нестакающихся)"""
         if item.stackable:
-            return item.id  # стакающиеся предметы одного id и качества можно объединять
+            return item.id
         return f"{item.id}_{item.quality.value}"
 
     def add_item(self, item: Item, quantity: int = 1) -> bool:
-        """Добавить предмет в инвентарь"""
         key = self._make_key(item)
 
         if len(self.items) >= self.capacity and key not in self.items:
@@ -231,14 +253,8 @@ class Inventory:
             return True
 
     def remove_item(self, item_id: str, quantity: int = 1, quality: ItemQuality = None) -> bool:
-        """
-        Удалить предмет.
-        Если quality указан — ищем точное совпадение.
-        Если нет — берём первый найденный с этим id.
-        """
         key = None
         if quality:
-            # Ищем точный ключ
             for k, data in self.items.items():
                 if data["item"].id == item_id and data["item"].quality == quality:
                     key = k
@@ -311,7 +327,6 @@ class Inventory:
         return "\n".join(lines)
 
 
-# Примеры предметов (по умолчанию обычного качества)
 SAMPLE_ITEMS = {
     "iron_sword": Item("iron_sword", "Железный меч", ItemType.WEAPON, "Прочный железный меч",
                        attack_bonus=8, value=50),
@@ -330,7 +345,6 @@ SAMPLE_ITEMS = {
 
 
 def create_item_with_quality(base_item: Item, quality: ItemQuality = None) -> Item:
-    """Создать копию предмета с указанным (или случайным) качеством"""
     if quality is None:
         quality = roll_quality()
     return Item(
