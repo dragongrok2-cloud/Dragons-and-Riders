@@ -7,7 +7,7 @@ from character import Rider
 from dragon import Dragon
 from clan import Clan
 from combat import Combat
-from inventory import SAMPLE_ITEMS
+from inventory import SAMPLE_ITEMS, ItemQuality, create_item_with_quality
 from save_system import SaveSystem
 from crafting import CraftingSystem
 
@@ -17,25 +17,21 @@ def main():
     print("Мир драконов ждёт тебя...\n")
 
     # Создаём игрока
-    player = Rider(name="Аэрион", level=3, health=100, attack=15, defense=10)  # Уровень 3 для крафта
+    player = Rider(name="Аэрион", level=3, health=100, attack=15, defense=10)
     player_dragon = Dragon(name="Игнис", element="fire", level=1, health=150, attack=25)
 
-    # Связываем наездника и дракона
     player.dragon = player_dragon
     player_dragon.rider = player
 
-    # Добавляем предметы в инвентарь
-    print("=== Получение стартовых предметов ===")
-    player.inventory.add_item(SAMPLE_ITEMS["iron_sword"])
-    player.inventory.add_item(SAMPLE_ITEMS["leather_armor"])
+    # Добавляем предметы разного качества
+    print("=== Получение предметов разного качества ===")
+    player.inventory.add_item(SAMPLE_ITEMS["iron_sword"])  # Обычный
+    player.inventory.add_item(create_item_with_quality(SAMPLE_ITEMS["leather_armor"], ItemQuality.UNCOMMON))
     player.inventory.add_item(SAMPLE_ITEMS["health_potion"], quantity=5)
-    player.inventory.add_item(SAMPLE_ITEMS["dragon_scale"], quantity=8)
-    player.inventory.add_item(SAMPLE_ITEMS["storm_amulet"])
-    player_dragon.inventory.add_item(SAMPLE_ITEMS["fire_saddle"])
+    player.inventory.add_item(SAMPLE_ITEMS["dragon_scale"], quantity=12)
+    player.inventory.add_item(create_item_with_quality(SAMPLE_ITEMS["storm_amulet"], ItemQuality.RARE))
+    player_dragon.inventory.add_item(create_item_with_quality(SAMPLE_ITEMS["fire_saddle"], ItemQuality.EPIC))
 
-    print()
-    print(player)
-    print(player_dragon)
     print()
     print(player.inventory)
     print()
@@ -65,17 +61,22 @@ def main():
     print("\nПробуем скрафтить Стальной меч...")
     crafting.craft("craft_steel_sword", player.inventory, player.level)
 
-    print("\nПробуем скрафтить Чешуйчатый доспех...")
-    crafting.craft("craft_scale_armor", player.inventory, player.level)
+    print()
+    print(player.inventory)
+    print()
+
+    # === Повышение качества ===
+    print("=== Повышение качества предмета ===")
+    print("Улучшаем стальной меч за чешую дракона...")
+    crafting.upgrade_item_quality(player.inventory, "steel_sword", material_cost=3)
 
     print()
     print(player.inventory)
     print()
 
-    # Экипируем скрафченные предметы
-    print("=== Экипируем новые предметы ===")
+    # Экипируем улучшенный меч
+    print("=== Экипируем улучшенный меч ===")
     player.equip_item("steel_sword")
-    player.equip_item("scale_armor")
 
     print()
     print(player)
@@ -86,25 +87,22 @@ def main():
     enemy = Rider(name="Тёмный Всадник", level=1, health=90, attack=18, defense=8)
     enemy_dragon = Dragon(name="Тенекрыл", element="shadow", level=1, health=140, attack=22)
 
-    # Создаём клан
     clan = Clan(name="Пламенные Крылья")
     clan.add_member(player)
 
     print(f"Ты — {player.name}, наездник дракона {player_dragon.name}")
     print(f"Твой клан: {clan.name}\n")
 
-    # Пример использования навыка
     print("=== Использование навыка ===")
     player.use_skill("power_strike")
     player_dragon.use_skill("fire_breath")
     print()
 
-    # Пример боя
     print("⚔️ Внезапно на тебя нападает враг!")
     combat = Combat(player, player_dragon, enemy, enemy_dragon)
     combat.start()
 
-    # === Система сохранения ===
+    # === Сохранение ===
     print("\n=== Система сохранения ===")
     save_system = SaveSystem()
 
