@@ -11,6 +11,7 @@ from inventory import SAMPLE_ITEMS, ItemQuality, create_item_with_quality
 from save_system import SaveSystem
 from crafting import CraftingSystem
 from enchanting import EnchantingSystem
+from dismantling import DismantlingSystem
 
 
 def main():
@@ -31,19 +32,21 @@ def main():
     player.inventory.add_item(create_item_with_quality(SAMPLE_ITEMS["storm_amulet"], ItemQuality.RARE))
     player_dragon.inventory.add_item(create_item_with_quality(SAMPLE_ITEMS["fire_saddle"], ItemQuality.EPIC))
 
+    # Добавим ещё один меч специально для разбора
+    player.inventory.add_item(create_item_with_quality(SAMPLE_ITEMS["iron_sword"], ItemQuality.RARE))
+
     print()
     print(player.inventory)
     print()
 
     # === Экипировка ===
     print("=== Экипировка ===")
-    player.equip_item("iron_sword")
+    player.equip_item("iron_sword")  # обычный
     player.equip_item("leather_armor")
     player_dragon.equip_item("fire_saddle")
 
     print()
     print(player)
-    print(player.equipment)
     print()
 
     # === Крафт ===
@@ -53,30 +56,47 @@ def main():
     print()
 
     # === Зачарование ===
-    print("=== Система зачарования ===")
+    print("=== Зачарование ===")
     enchanter = EnchantingSystem()
-    enchanter.print_available()
 
     print("\nНакладываем «Остроту 2» на стальной меч...")
     enchanter.enchant_item(player.inventory, "steel_sword", "sharpness", level=2)
 
-    print("\nНакладываем «Критический удар 1» на стальной меч...")
+    print("\nНакладываем «Критический удар 1»...")
     enchanter.enchant_item(player.inventory, "steel_sword", "crit_chance", level=1)
-
-    print("\nНакладываем «Защиту 2» на кожаный доспех...")
-    enchanter.enchant_item(player.inventory, "leather_armor", "protection", level=2)
-
-    print("\nНакладываем «Пламя 1» на огненное седло дракона...")
-    enchanter.enchant_item(player_dragon.inventory, "fire_saddle", "flame", level=1)
 
     print()
     print(player.inventory)
     print()
-    print(player_dragon.inventory)
+
+    # === Разбор предметов ===
+    print("=== Система разбора предметов ===")
+    dismantler = DismantlingSystem()
+
+    # Посмотрим, что даст разбор редкого железного меча
+    rare_sword = player.inventory.get_item("iron_sword", ItemQuality.RARE)
+    if rare_sword:
+        print(dismantler.preview(rare_sword))
+        print("\nРазбираем редкий железный меч...")
+        dismantler.dismantle(player.inventory, "iron_sword", quality=ItemQuality.RARE)
+
+    print()
+    print(player.inventory)
+    print()
+
+    # Разберём амулет (редкий + ценность)
+    print("Разбираем редкий амулет бури...")
+    amulet = player.inventory.get_item("storm_amulet")
+    if amulet:
+        print(dismantler.preview(amulet))
+        dismantler.dismantle(player.inventory, "storm_amulet")
+
+    print()
+    print(player.inventory)
     print()
 
     # Экипируем зачарованный меч
-    print("=== Экипируем зачарованный меч ===")
+    print("=== Экипируем зачарованный стальной меч ===")
     player.equip_item("steel_sword")
 
     print()
@@ -84,7 +104,7 @@ def main():
     print(player.equipment)
     print()
 
-    # Враг и бой
+    # Бой
     enemy = Rider(name="Тёмный Всадник", level=1, health=90, attack=18, defense=8)
     enemy_dragon = Dragon(name="Тенекрыл", element="shadow", level=1, health=140, attack=22)
 
@@ -113,7 +133,6 @@ def main():
     if loaded:
         loaded_player = Rider.from_dict(loaded["player"])
         print(f"Загружен: {loaded_player}")
-        print(loaded_player.equipment)
 
 
 if __name__ == "__main__":
